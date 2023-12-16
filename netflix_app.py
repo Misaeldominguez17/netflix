@@ -7,14 +7,42 @@ key_dict = json.loads(st.secrets["textkey"])
 creds = service_account.Credentials.from_service_account_info(key_dict)
 db = firestore.Client(credentials=creds, project="netflix-adcac")
 
-dbNames = db.collection("movies")
-st.header("Nuevo registro")
-company = st.text_input("Company")
-director = st.text_input("Director")
-genre = st.text_input("Genre")
-name = st.text_input("Name")
+st.header("Aplicacion Netflix")
+names_ref = list(db.collection(u'movies').stream())
+names_dict = list(map(lambda x: x.to_dict(), names_ref))
+names_dataframe = pd.DataFrame(names_dict)
 
-submit = st.button("Crear nuevo registro")
+
+################### filtrar data #################
+st.sidebar.header("Buscar nombre de pelicula")
+nameSearch = st.sidebar.text_input("nombre")
+btnFiltrar = st.sidebar.button("Buscar")
+if btnFiltrar:
+  names_dataframe = names_dataframe[names_dataframe.name.str.contains(nameSearch,case=False)]
+
+  if names_dataframe.shape[0] == 0:
+    st.sidebar.write("Nombre no existe")
+
+################## filtro por escritor ################
+
+st.sidebar.header("Buscar nombre de director")
+selected_director = st.sidebar.selectbox("Selecionar director", names_dataframe['director'].unique())
+btnFiltrar2 = st.sidebar.button("Buscar director")
+
+if btnFiltrar2:
+  #names_dataframe = names_dataframe[(names_dataframe.director == selected_director) & (names_dataframe.name.str.contains(nameSearch,case=False))]
+  names_dataframe = names_dataframe[(names_dataframe.director == selected_director) ]
+
+
+################## nuevo registro ################
+
+st.sidebar.header("Nuevo registro")
+company = st.sidebar.text_input("Company")
+director = st.sidebar.text_input("Director")
+genre = st.sidebar.text_input("Genre")
+name = st.sidebar.text_input("Name")
+submit = st.sidebar.button("Crear nuevo registro")
+
 # Once the name has submitted, upload it to the database
 if company and director and genre and name and submit:
   doc_ref = db.collection("movies").document(name)
@@ -25,51 +53,11 @@ if company and director and genre and name and submit:
   "name": name
   })
   st.sidebar.write("Registro insertado correctamente")
-# ...
-def loadByName(name):
-  names_ref = dbNames.where(u'name', u'==', name)
-  currentName = None
-  for myname in names_ref.stream():
-    currentName = myname
-  return currentName
+###################### fin ############################
 
-st.sidebar.subheader("Buscar nombre")
-nameSearch = st.sidebar.text_input("nombre")
-btnFiltrar = st.sidebar.button("Buscar")
-if btnFiltrar:
-  doc = loadByName(nameSearch)
-  if doc is None:
-    st.sidebar.write("Nombre no existe")
-  else:
-    st.sidebar.write(doc.to_dict())
-# ...
-st.sidebar.markdown("""---""")
-btnEliminar = st.sidebar.button("Eliminar")
-if btnEliminar:
-  deletename = loadByName(nameSearch)
-  if deletename is None:
-    st.sidebar.write(f"{nameSearch} no existe")
-  else:
-    dbNames.document(deletename.id).delete()
-    st.sidebar.write(f"{nameSearch} eliminado")
-#...
-st.sidebar.markdown("""---""")
-newname = st.sidebar.text_input("Actualizar nombre")
-btnActualizar = st.sidebar.button("Actualizar")
-if btnActualizar:
-  updatename = loadByName(nameSearch)
-  if updatename is None:
-    st.write(f"{nameSearch} no existe")
-  else:
-    myupdatename = dbNames.document(updatename.id)
-    myupdatename.update(
-    {
-    "name": newname
-    }
-    )
-# ...
-names_ref = list(db.collection(u'movies').stream())
-names_dict = list(map(lambda x: x.to_dict(), names_ref))
-names_dataframe = pd.DataFrame(names_dict)
+st.text(str(names_dataframe.shape[0]) + ' peliculas encontradas')
 st.dataframe(names_dataframe)
+
+
+
 
